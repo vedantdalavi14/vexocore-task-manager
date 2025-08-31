@@ -50,27 +50,17 @@ function Countdown({ dueDate }) {
   );
 }
 
-// --- Logout Confirmation Modal ---
-function LogoutConfirmModal({ onConfirm, onCancel }) {
+// --- Reusable Confirmation Modal ---
+function ConfirmationModal({ icon: Icon, title, message, confirmText, onConfirm, onCancel }) {
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50">
             <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl p-6 w-full max-w-sm text-center">
-                <AlertTriangle className="mx-auto w-12 h-12 text-red-500 mb-4" />
-                <h3 className="text-xl font-bold text-white mb-2">Are you sure?</h3>
-                <p className="text-gray-400 mb-6">You will be logged out of your account.</p>
+                <Icon className="mx-auto w-12 h-12 text-red-500 mb-4" />
+                <h3 className="text-xl font-bold text-white mb-2">{title}</h3>
+                <p className="text-gray-400 mb-6">{message}</p>
                 <div className="flex justify-center gap-4">
-                    <button 
-                        onClick={onCancel} 
-                        className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200"
-                    >
-                        Cancel
-                    </button>
-                    <button 
-                        onClick={onConfirm} 
-                        className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200"
-                    >
-                        Confirm Logout
-                    </button>
+                    <button onClick={onCancel} className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">Cancel</button>
+                    <button onClick={onConfirm} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">{confirmText}</button>
                 </div>
             </div>
         </div>
@@ -88,7 +78,8 @@ export default function DashboardPage() {
   const [editingTaskText, setEditingTaskText] = useState('');
   const [editingDueDate, setEditingDueDate] = useState('');
   const [filter, setFilter] = useState('all');
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false); // New state for modal
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState(null); // State for delete confirmation
 
   const getNowString = () => {
     const now = new Date();
@@ -140,9 +131,17 @@ export default function DashboardPage() {
     await updateDoc(taskRef, { status: task.status === 'pending' ? 'completed' : 'pending' });
   };
 
-  const handleDeleteTask = async (taskId) => {
-    const taskRef = doc(db, "tasks", taskId);
-    await deleteDoc(taskRef);
+  // --- Delete Task with Confirmation ---
+  const handleDeleteTask = (task) => {
+    setTaskToDelete(task); // Set the task to be deleted, which shows the modal
+  };
+
+  const confirmDeleteTask = async () => {
+    if (taskToDelete) {
+      const taskRef = doc(db, "tasks", taskToDelete.id);
+      await deleteDoc(taskRef);
+      setTaskToDelete(null); // Close the modal after deletion
+    }
   };
 
   const handleStartEdit = (task) => {
@@ -163,13 +162,7 @@ export default function DashboardPage() {
     await updateDoc(taskRef, { text: editingTaskText.trim(), dueDate: editingDueDate });
     handleCancelEdit();
   };
-
-  // Updated logout handler to show modal
-  const handleLogout = () => {
-    setShowLogoutConfirm(true);
-  };
-
-  // Function to perform the actual logout
+  
   const confirmLogout = () => {
     signOut(auth).catch(error => console.error("Failed to log out", error));
     setShowLogoutConfirm(false);
@@ -177,7 +170,9 @@ export default function DashboardPage() {
 
   return (
     <>
-      {showLogoutConfirm && <LogoutConfirmModal onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />}
+      {showLogoutConfirm && <ConfirmationModal icon={AlertTriangle} title="Are you sure?" message="You will be logged out of your account." confirmText="Confirm Logout" onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />}
+      {taskToDelete && <ConfirmationModal icon={Trash2} title="Delete Task?" message={`This will permanently delete the task: "${taskToDelete.text}"`} confirmText="Delete Task" onConfirm={confirmDeleteTask} onCancel={() => setTaskToDelete(null)} />}
+      
       <div className="w-full max-w-3xl mx-auto p-4 md:p-6">
         <header className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-3">
@@ -186,7 +181,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-4">
             <span className="text-gray-400 text-sm hidden sm:block">{currentUser?.email}</span>
-            <button onClick={handleLogout} className="bg-gray-700 hover:bg-red-600 hover:text-white text-gray-300 font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline transition-colors duration-200">
+            <button onClick={() => setShowLogoutConfirm(true)} className="bg-gray-700 hover:bg-red-600 hover:text-white text-gray-300 font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline transition-colors duration-200">
               Logout
             </button>
           </div>
@@ -269,7 +264,7 @@ export default function DashboardPage() {
                               {task.status}
                           </span>
                           <button onClick={() => handleStartEdit(task)} className="text-gray-400 hover:text-yellow-400 p-1.5 rounded-md hover:bg-gray-600/50"><Pencil size={16} /></button>
-                          <button onClick={() => handleDeleteTask(task.id)} className="text-gray-400 hover:text-red-400 p-1.5 rounded-md hover:bg-gray-600/50"><Trash2 size={16} /></button>
+                          <button onClick={() => handleDeleteTask(task)} className="text-gray-400 hover:text-red-400 p-1.5 rounded-md hover:bg-gray-600/50"><Trash2 size={16} /></button>
                         </div>
                       </div>
                     )}
