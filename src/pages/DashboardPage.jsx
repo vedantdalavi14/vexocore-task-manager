@@ -3,7 +3,7 @@ import { signOut } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { Plus, Trash2, Pencil, Calendar, Clock } from 'lucide-react';
+import { Plus, Trash2, Pencil, Calendar, Clock, CheckSquare, AlertTriangle } from 'lucide-react';
 
 // --- Countdown Timer Component ---
 function Countdown({ dueDate }) {
@@ -28,27 +28,53 @@ function Countdown({ dueDate }) {
     const timer = setTimeout(() => {
       setTimeLeft(calculateTimeLeft());
     }, 1000);
-    // Clear timeout if the component is unmounted
     return () => clearTimeout(timer);
   });
 
   const isOverdue = +new Date(dueDate) < +new Date();
 
   if (isOverdue) {
-    return <span className="text-xs font-bold text-red-500 flex items-center gap-1"><Clock size={12} /> Overdue</span>;
+    return <span className="text-xs font-bold text-red-400 flex items-center gap-1"><Clock size={12} /> Overdue</span>;
   }
 
   const timerComponents = [];
-  if (timeLeft.days > 0) timerComponents.push(<span>{timeLeft.days}d</span>);
-  if (timeLeft.hours > 0) timerComponents.push(<span>{timeLeft.hours}h</span>);
-  timerComponents.push(<span>{timeLeft.minutes}m</span>);
-  timerComponents.push(<span>{timeLeft.seconds}s</span>);
+  if (timeLeft.days > 0) timerComponents.push(`${timeLeft.days}d`);
+  if (timeLeft.hours > 0) timerComponents.push(`${timeLeft.hours}h`);
+  timerComponents.push(`${timeLeft.minutes}m`);
+  timerComponents.push(`${timeLeft.seconds}s`);
 
   return (
     <span className="text-xs text-cyan-400 font-mono flex items-center gap-1">
-      {timerComponents.map((component, index) => <React.Fragment key={index}>{component} </React.Fragment>)} left
+      <Clock size={12} /> {timerComponents.join(' ')} left
     </span>
   );
+}
+
+// --- Logout Confirmation Modal ---
+function LogoutConfirmModal({ onConfirm, onCancel }) {
+    return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50">
+            <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl p-6 w-full max-w-sm text-center">
+                <AlertTriangle className="mx-auto w-12 h-12 text-red-500 mb-4" />
+                <h3 className="text-xl font-bold text-white mb-2">Are you sure?</h3>
+                <p className="text-gray-400 mb-6">You will be logged out of your account.</p>
+                <div className="flex justify-center gap-4">
+                    <button 
+                        onClick={onCancel} 
+                        className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        onClick={onConfirm} 
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200"
+                    >
+                        Confirm Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 
@@ -61,7 +87,8 @@ export default function DashboardPage() {
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editingTaskText, setEditingTaskText] = useState('');
   const [editingDueDate, setEditingDueDate] = useState('');
-  const [filter, setFilter] = useState('all'); // 'all', 'pending', 'completed'
+  const [filter, setFilter] = useState('all');
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false); // New state for modal
 
   const getNowString = () => {
     const now = new Date();
@@ -70,19 +97,12 @@ export default function DashboardPage() {
   };
   const nowString = getNowString();
 
-  // Fetch tasks from Firestore in real-time
   useEffect(() => {
     if (currentUser) {
       const q = query(collection(db, "tasks"), where("userId", "==", currentUser.uid));
       const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const tasksData = [];
-        querySnapshot.forEach((doc) => {
-          tasksData.push({ ...doc.data(), id: doc.id });
-        });
-        tasksData.sort((a, b) => {
-          if (a.status === b.status) return b.createdAt?.seconds - a.createdAt?.seconds;
-          return a.status === 'pending' ? -1 : 1;
-        });
+        const tasksData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        tasksData.sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds);
         setTasks(tasksData);
         setLoading(false);
       });
@@ -90,17 +110,13 @@ export default function DashboardPage() {
     }
   }, [currentUser]);
   
-  // Memoized filtered tasks
   const filteredTasks = useMemo(() => {
-    return tasks.filter(task => {
-      if (filter === 'pending') return task.status === 'pending';
-      if (filter === 'completed') return task.status === 'completed';
-      return true; // for 'all'
-    });
+    const sortedTasks = [...tasks].sort((a, b) => (a.status === 'pending' && b.status !== 'pending') ? -1 : (a.status !== 'pending' && b.status === 'pending') ? 1 : 0);
+    if (filter === 'pending') return sortedTasks.filter(task => task.status === 'pending');
+    if (filter === 'completed') return sortedTasks.filter(task => task.status === 'completed');
+    return sortedTasks;
   }, [tasks, filter]);
 
-
-  // Add a new task
   const handleAddTask = async (e) => {
     e.preventDefault();
     if (newTask.trim() === "") return;
@@ -119,19 +135,16 @@ export default function DashboardPage() {
     }
   };
 
-  // Toggle task status
   const handleToggleStatus = async (task) => {
     const taskRef = doc(db, "tasks", task.id);
     await updateDoc(taskRef, { status: task.status === 'pending' ? 'completed' : 'pending' });
   };
 
-  // Delete a task
   const handleDeleteTask = async (taskId) => {
     const taskRef = doc(db, "tasks", taskId);
     await deleteDoc(taskRef);
   };
 
-  // --- Edit Task Functions ---
   const handleStartEdit = (task) => {
     setEditingTaskId(task.id);
     setEditingTaskText(task.text);
@@ -147,139 +160,133 @@ export default function DashboardPage() {
   const handleUpdateTask = async (taskId) => {
     if (editingTaskText.trim() === "") return;
     const taskRef = doc(db, "tasks", taskId);
-    try {
-      await updateDoc(taskRef, { 
-        text: editingTaskText.trim(),
-        dueDate: editingDueDate,
-      });
-      handleCancelEdit();
-    } catch (error)
-    {
-      console.error("Error updating task: ", error);
-    }
+    await updateDoc(taskRef, { text: editingTaskText.trim(), dueDate: editingDueDate });
+    handleCancelEdit();
   };
 
-  // Logout handler
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error("Failed to log out", error);
-    }
+  // Updated logout handler to show modal
+  const handleLogout = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  // Function to perform the actual logout
+  const confirmLogout = () => {
+    signOut(auth).catch(error => console.error("Failed to log out", error));
+    setShowLogoutConfirm(false);
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto p-4 md:p-8">
-      <header className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-white">Task Manager</h1>
-          <p className="text-gray-400">Welcome, {currentUser?.email}</p>
-        </div>
-        <button onClick={handleLogout} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-          Logout
-        </button>
-      </header>
+    <>
+      {showLogoutConfirm && <LogoutConfirmModal onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />}
+      <div className="w-full max-w-3xl mx-auto p-4 md:p-6">
+        <header className="flex justify-between items-center mb-6">
+          <div className="flex items-center gap-3">
+              <CheckSquare className="w-8 h-8 text-blue-500" />
+              <h1 className="text-3xl font-bold text-white tracking-tighter">TaskFlow</h1>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-gray-400 text-sm hidden sm:block">{currentUser?.email}</span>
+            <button onClick={handleLogout} className="bg-gray-700 hover:bg-red-600 hover:text-white text-gray-300 font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline transition-colors duration-200">
+              Logout
+            </button>
+          </div>
+        </header>
 
-      <main className="bg-gray-800 p-6 rounded-lg shadow-lg">
-        <form onSubmit={handleAddTask} className="flex flex-col sm:flex-row gap-4 mb-6">
-          <input
-            type="text"
-            value={newTask}
-            onChange={(e) => setNewTask(e.target.value)}
-            placeholder="Add a new task..."
-            className="flex-grow bg-gray-700 text-white rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="datetime-local"
-            value={dueDate}
-            min={nowString}
-            onChange={(e) => setDueDate(e.target.value)}
-            className="bg-gray-700 text-white rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white font-bold p-2 rounded-md flex items-center justify-center">
-            <Plus size={24} />
-          </button>
-        </form>
+        <main className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 p-6 rounded-xl shadow-2xl">
+          <form onSubmit={handleAddTask} className="flex flex-col sm:flex-row gap-3 mb-6">
+            <input
+              type="text"
+              value={newTask}
+              onChange={(e) => setNewTask(e.target.value)}
+              placeholder="What's your next task?"
+              className="flex-grow bg-gray-700/50 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <input
+              type="datetime-local"
+              value={dueDate}
+              min={nowString}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="bg-gray-700/50 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white font-bold p-2.5 rounded-lg flex items-center justify-center transition-colors duration-200">
+              <Plus size={20} /> <span className="sm:hidden ml-2">Add Task</span>
+            </button>
+          </form>
 
-        {/* --- Filter Tabs --- */}
-        <div className="flex justify-center gap-4 mb-6 border-b border-gray-700 pb-3">
-          <button onClick={() => setFilter('all')} className={`font-medium px-3 py-1 rounded-md ${filter === 'all' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>All</button>
-          <button onClick={() => setFilter('pending')} className={`font-medium px-3 py-1 rounded-md ${filter === 'pending' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>Pending</button>
-          <button onClick={() => setFilter('completed')} className={`font-medium px-3 py-1 rounded-md ${filter === 'completed' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>Completed</button>
-        </div>
+          <div className="flex justify-center gap-2 mb-6 bg-gray-900/40 p-1.5 rounded-lg">
+            <button onClick={() => setFilter('all')} className={`flex-1 font-medium text-sm px-3 py-1.5 rounded-md transition-colors duration-200 ${filter === 'all' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700/50 hover:text-white'}`}>All Tasks</button>
+            <button onClick={() => setFilter('pending')} className={`flex-1 font-medium text-sm px-3 py-1.5 rounded-md transition-colors duration-200 ${filter === 'pending' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700/50 hover:text-white'}`}>Pending</button>
+            <button onClick={() => setFilter('completed')} className={`flex-1 font-medium text-sm px-3 py-1.5 rounded-md transition-colors duration-200 ${filter === 'completed' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700/50 hover:text-white'}`}>Completed</button>
+          </div>
 
-        <div>
-          {loading ? ( <p className="text-center text-gray-400">Loading tasks...</p> ) : 
-           filteredTasks.length > 0 ? (
-            <ul className="space-y-3">
-              {filteredTasks.map(task => (
-                <li key={task.id} className="bg-gray-700 p-3 rounded-md min-h-[58px]">
-                  {editingTaskId === task.id ? (
-                    <div className="flex flex-col gap-2">
-                       <input
-                        type="text"
-                        value={editingTaskText}
-                        onChange={(e) => setEditingTaskText(e.target.value)}
-                        className="w-full bg-gray-600 text-white rounded-md px-3 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <div className="flex items-center justify-between gap-3">
+          <div className="min-h-[200px]">
+            {loading ? ( <p className="text-center text-gray-400 pt-10">Loading your tasks...</p> ) : 
+            filteredTasks.length > 0 ? (
+              <ul className="space-y-3">
+                {filteredTasks.map(task => (
+                  <li key={task.id} className="bg-gray-700/50 p-3 rounded-lg border border-transparent hover:border-gray-600 transition-colors duration-200">
+                    {editingTaskId === task.id ? (
+                      <div className="flex flex-col gap-2">
                         <input
-                            type="datetime-local"
-                            value={editingDueDate}
-                            min={nowString}
-                            onChange={(e) => setEditingDueDate(e.target.value)}
-                            className="bg-gray-600 text-white rounded-md px-3 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          type="text"
+                          value={editingTaskText}
+                          onChange={(e) => setEditingTaskText(e.target.value)}
+                          className="w-full bg-gray-600 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
+                        <div className="flex items-center justify-between gap-3">
+                          <input
+                              type="datetime-local"
+                              value={editingDueDate}
+                              min={nowString}
+                              onChange={(e) => setEditingDueDate(e.target.value)}
+                              className="bg-gray-600 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          <div className="flex items-center gap-3">
+                            <button onClick={() => handleUpdateTask(task.id)} className="text-green-400 hover:text-green-300 font-semibold">Save</button>
+                            <button onClick={handleCancelEdit} className="text-gray-400 hover:text-gray-300">Cancel</button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                           <button onClick={() => handleUpdateTask(task.id)} className="text-green-400 hover:text-green-300 font-semibold">Save</button>
-                           <button onClick={handleCancelEdit} className="text-gray-400 hover:text-gray-300">Cancel</button>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" checked={task.status === 'completed'} onChange={() => handleToggleStatus(task)} className="sr-only peer" />
+                            <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                          </label>
+                          <div className="flex flex-col">
+                            <span className={`text-white ${task.status === 'completed' ? 'line-through text-gray-400' : ''}`}>{task.text}</span>
+                            {task.dueDate && (
+                              <div className="flex items-center gap-3 text-xs text-gray-400 mt-1.5">
+                                <div className="flex items-center gap-1.5"><Calendar size={12}/> <span>{new Date(task.dueDate).toLocaleString()}</span></div>
+                                {task.status === 'pending' && <Countdown dueDate={task.dueDate} />}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${task.status === 'pending' ? 'bg-yellow-500/20 text-yellow-300' : 'bg-green-500/20 text-green-300'}`}>
+                              {task.status}
+                          </span>
+                          <button onClick={() => handleStartEdit(task)} className="text-gray-400 hover:text-yellow-400 p-1.5 rounded-md hover:bg-gray-600/50"><Pencil size={16} /></button>
+                          <button onClick={() => handleDeleteTask(task.id)} className="text-gray-400 hover:text-red-400 p-1.5 rounded-md hover:bg-gray-600/50"><Trash2 size={16} /></button>
                         </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                         <label className="relative inline-flex items-center cursor-pointer">
-                           <input type="checkbox" checked={task.status === 'completed'} onChange={() => handleToggleStatus(task)} className="sr-only peer" />
-                           <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                         </label>
-                        <div className="flex flex-col">
-                           <div className="flex items-center gap-2">
-                             <span className={`text-white ${task.status === 'completed' ? 'line-through text-gray-500' : ''}`}>{task.text}</span>
-                              {task.status === 'pending' ? (
-                                <span className="text-xs font-semibold bg-yellow-500 text-yellow-900 px-2 py-0.5 rounded-full">Pending</span>
-                              ) : (
-                                <span className="text-xs font-semibold bg-green-500 text-green-900 px-2 py-0.5 rounded-full">Completed</span>
-                              )}
-                           </div>
-                           {task.dueDate && (
-                            <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
-                              <Calendar size={12}/>
-                              <span>{new Date(task.dueDate).toLocaleString()}</span>
-                              {task.status === 'pending' && <Countdown dueDate={task.dueDate} />}
-                            </div>
-                           )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <button onClick={() => handleStartEdit(task)} className="text-gray-400 hover:text-yellow-500"><Pencil size={18} /></button>
-                        <button onClick={() => handleDeleteTask(task.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={18} /></button>
-                      </div>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          ) : ( 
-            <p className="text-center text-gray-500 pt-4">
-              {filter === 'all' && 'You have no tasks. Add one to get started!'}
-              {filter === 'pending' && 'No pending tasks. Great job!'}
-              {filter === 'completed' && 'No tasks completed yet.'}
-            </p>
-          )}
-        </div>
-      </main>
-    </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : ( 
+              <p className="text-center text-gray-500 pt-10">
+                {filter === 'all' && "You're all caught up!"}
+                {filter === 'pending' && 'No pending tasks. Great job!'}
+                {filter === 'completed' && 'No tasks completed yet.'}
+              </p>
+            )}
+          </div>
+        </main>
+      </div>
+    </>
   );
 }
 

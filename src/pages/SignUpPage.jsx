@@ -1,79 +1,79 @@
 import React, { useState } from 'react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebase'; // Import auth from our firebase config
+import { auth } from '../firebase';
+import AuthLayout from '../components/AuthLayout';
+import { Mail, Lock } from 'lucide-react';
 
-export default function SignUpPage() {
+export default function SignUpPage({ onSwitch }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(''); // Clear previous errors
-
-    // Basic password validation
+    setError('');
+    setLoading(true);
     if (password.length < 6) {
-      setError("Password should be at least 6 characters long.");
+      setError("Password must be at least 6 characters long.");
+      setLoading(false);
       return;
     }
-
     try {
-      // Use the Firebase function to create a new user
       await createUserWithEmailAndPassword(auth, email, password);
-      // If successful, the onAuthStateChanged listener in AuthContext will handle the redirect.
     } catch (err) {
-      // Display a more user-friendly error message
-      if (err.code === 'auth/email-already-in-use') {
-        setError('This email address is already in use.');
-      } else {
-        setError('Failed to create an account. Please try again.');
-      }
-      console.error(err); // Log the original error for debugging
+      setError("Failed to create an account. The email may already be in use.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="w-full max-w-xs mx-auto">
-      <form onSubmit={handleSubmit} className="bg-gray-800 shadow-2xl rounded-lg px-8 pt-6 pb-8 mb-4">
-        <h2 className="text-2xl font-bold mb-6 text-center text-gray-100">Create Account</h2>
+    <AuthLayout 
+      title="Create an Account"
+      subtitle="Start organizing your life, one task at a time."
+      switchFormText="Already have an account?"
+      switchFormLink="Log In"
+      onSwitch={onSwitch}
+    >
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {error && <p className="bg-red-500/20 border border-red-500 text-red-300 text-sm py-2 px-3 rounded-lg">{error}</p>}
         
-        {/* Error message display */}
-        {error && <p className="bg-red-500 text-white text-sm py-2 px-3 rounded-md mb-4 text-center">{error}</p>}
-        
-        <div className="mb-4">
-          <label className="block text-gray-300 text-sm font-bold mb-2" htmlFor="email">
-            Email
-          </label>
+        <div className="relative">
+          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
-            className="shadow appearance-none border border-gray-600 rounded w-full py-2 px-3 bg-gray-700 text-white leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="shadow-inner appearance-none border border-gray-600 rounded-lg w-full py-3 pl-10 pr-3 bg-gray-700 text-white leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             id="email"
             type="email"
-            placeholder="you@example.com"
+            placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
           />
         </div>
-        <div className="mb-6">
-          <label className="block text-gray-300 text-sm font-bold mb-2" htmlFor="password">
-            Password
-          </label>
+
+        <div className="relative">
+          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
-            className="shadow appearance-none border border-gray-600 rounded w-full py-2 px-3 bg-gray-700 text-white mb-3 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="shadow-inner appearance-none border border-gray-600 rounded-lg w-full py-3 pl-10 pr-3 bg-gray-700 text-white leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             id="password"
             type="password"
-            placeholder="******************"
+            placeholder="Password (min. 6 characters)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
           />
         </div>
-        <div className="flex items-center justify-between">
-          <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full transition-colors duration-200" type="submit">
-            Sign Up
-          </button>
-        </div>
+
+        <button 
+          className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:shadow-outline transition-colors duration-200" 
+          type="submit"
+          disabled={loading}
+        >
+          {loading ? 'Creating Account...' : 'Sign Up'}
+        </button>
       </form>
-    </div>
+    </AuthLayout>
   );
 }
+
