@@ -1,9 +1,56 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { signOut } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { Plus, Trash2, Pencil, Calendar } from 'lucide-react';
+import { Plus, Trash2, Pencil, Calendar, Clock } from 'lucide-react';
+
+// --- Countdown Timer Component ---
+function Countdown({ dueDate }) {
+  const calculateTimeLeft = () => {
+    const difference = +new Date(dueDate) - +new Date();
+    let timeLeft = {};
+
+    if (difference > 0) {
+      timeLeft = {
+        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((difference / 1000 / 60) % 60),
+        seconds: Math.floor((difference / 1000) % 60),
+      };
+    }
+    return timeLeft;
+  };
+
+  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setTimeLeft(calculateTimeLeft());
+    }, 1000);
+    // Clear timeout if the component is unmounted
+    return () => clearTimeout(timer);
+  });
+
+  const isOverdue = +new Date(dueDate) < +new Date();
+
+  if (isOverdue) {
+    return <span className="text-xs font-bold text-red-500 flex items-center gap-1"><Clock size={12} /> Overdue</span>;
+  }
+
+  const timerComponents = [];
+  if (timeLeft.days > 0) timerComponents.push(<span>{timeLeft.days}d</span>);
+  if (timeLeft.hours > 0) timerComponents.push(<span>{timeLeft.hours}h</span>);
+  timerComponents.push(<span>{timeLeft.minutes}m</span>);
+  timerComponents.push(<span>{timeLeft.seconds}s</span>);
+
+  return (
+    <span className="text-xs text-cyan-400 font-mono flex items-center gap-1">
+      {timerComponents.map((component, index) => <React.Fragment key={index}>{component} </React.Fragment>)} left
+    </span>
+  );
+}
+
 
 export default function DashboardPage() {
   const { currentUser } = useAuth();
@@ -14,8 +61,14 @@ export default function DashboardPage() {
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editingTaskText, setEditingTaskText] = useState('');
   const [editingDueDate, setEditingDueDate] = useState('');
+  const [filter, setFilter] = useState('all'); // 'all', 'pending', 'completed'
 
-  const todayString = new Date().toISOString().split("T")[0];
+  const getNowString = () => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return now.toISOString().slice(0, 16);
+  };
+  const nowString = getNowString();
 
   // Fetch tasks from Firestore in real-time
   useEffect(() => {
@@ -36,6 +89,16 @@ export default function DashboardPage() {
       return unsubscribe;
     }
   }, [currentUser]);
+  
+  // Memoized filtered tasks
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(task => {
+      if (filter === 'pending') return task.status === 'pending';
+      if (filter === 'completed') return task.status === 'completed';
+      return true; // for 'all'
+    });
+  }, [tasks, filter]);
+
 
   // Add a new task
   const handleAddTask = async (e) => {
@@ -127,9 +190,9 @@ export default function DashboardPage() {
             className="flex-grow bg-gray-700 text-white rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <input
-            type="date"
+            type="datetime-local"
             value={dueDate}
-            min={todayString}
+            min={nowString}
             onChange={(e) => setDueDate(e.target.value)}
             className="bg-gray-700 text-white rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
@@ -138,11 +201,18 @@ export default function DashboardPage() {
           </button>
         </form>
 
+        {/* --- Filter Tabs --- */}
+        <div className="flex justify-center gap-4 mb-6 border-b border-gray-700 pb-3">
+          <button onClick={() => setFilter('all')} className={`font-medium px-3 py-1 rounded-md ${filter === 'all' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>All</button>
+          <button onClick={() => setFilter('pending')} className={`font-medium px-3 py-1 rounded-md ${filter === 'pending' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>Pending</button>
+          <button onClick={() => setFilter('completed')} className={`font-medium px-3 py-1 rounded-md ${filter === 'completed' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>Completed</button>
+        </div>
+
         <div>
           {loading ? ( <p className="text-center text-gray-400">Loading tasks...</p> ) : 
-           tasks.length > 0 ? (
+           filteredTasks.length > 0 ? (
             <ul className="space-y-3">
-              {tasks.map(task => (
+              {filteredTasks.map(task => (
                 <li key={task.id} className="bg-gray-700 p-3 rounded-md min-h-[58px]">
                   {editingTaskId === task.id ? (
                     <div className="flex flex-col gap-2">
@@ -154,9 +224,9 @@ export default function DashboardPage() {
                       />
                       <div className="flex items-center justify-between gap-3">
                         <input
-                            type="date"
+                            type="datetime-local"
                             value={editingDueDate}
-                            min={todayString}
+                            min={nowString}
                             onChange={(e) => setEditingDueDate(e.target.value)}
                             className="bg-gray-600 text-white rounded-md px-3 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
@@ -174,11 +244,19 @@ export default function DashboardPage() {
                            <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                          </label>
                         <div className="flex flex-col">
-                           <span className={`text-white ${task.status === 'completed' ? 'line-through text-gray-500' : ''}`}>{task.text}</span>
+                           <div className="flex items-center gap-2">
+                             <span className={`text-white ${task.status === 'completed' ? 'line-through text-gray-500' : ''}`}>{task.text}</span>
+                              {task.status === 'pending' ? (
+                                <span className="text-xs font-semibold bg-yellow-500 text-yellow-900 px-2 py-0.5 rounded-full">Pending</span>
+                              ) : (
+                                <span className="text-xs font-semibold bg-green-500 text-green-900 px-2 py-0.5 rounded-full">Completed</span>
+                              )}
+                           </div>
                            {task.dueDate && (
-                            <div className="flex items-center gap-1 text-xs text-gray-400 mt-1">
+                            <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
                               <Calendar size={12}/>
-                              <span>{new Date(task.dueDate).toLocaleDateString()}</span>
+                              <span>{new Date(task.dueDate).toLocaleString()}</span>
+                              {task.status === 'pending' && <Countdown dueDate={task.dueDate} />}
                             </div>
                            )}
                         </div>
@@ -192,7 +270,13 @@ export default function DashboardPage() {
                 </li>
               ))}
             </ul>
-          ) : ( <p className="text-center text-gray-500">You have no tasks. Add one to get started!</p> )}
+          ) : ( 
+            <p className="text-center text-gray-500 pt-4">
+              {filter === 'all' && 'You have no tasks. Add one to get started!'}
+              {filter === 'pending' && 'No pending tasks. Great job!'}
+              {filter === 'completed' && 'No tasks completed yet.'}
+            </p>
+          )}
         </div>
       </main>
     </div>
