@@ -7,6 +7,7 @@ import { Mail, Lock } from 'lucide-react';
 export default function SignUpPage({ onSwitch }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -14,11 +15,19 @@ export default function SignUpPage({ onSwitch }) {
     e.preventDefault();
     setError('');
     setLoading(true);
+    
     if (password.length < 6) {
       setError("Password must be at least 6 characters long.");
       setLoading(false);
       return;
     }
+    
+    if (password !== confirmPassword) {
+      setError("Passwords do not match. Please try again.");
+      setLoading(false);
+      return;
+    }
+    
     try {
       await createUserWithEmailAndPassword(auth, email, password);
     } catch (err) {
@@ -61,6 +70,19 @@ export default function SignUpPage({ onSwitch }) {
             placeholder="Password (min. 6 characters)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
+
+        <div className="relative">
+          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            className="shadow-inner appearance-none border border-gray-600 rounded-lg w-full py-3 pl-10 pr-3 bg-gray-700 text-white leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            id="confirmPassword"
+            type="password"
+            placeholder="Confirm Password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
             required
           />
         </div>
