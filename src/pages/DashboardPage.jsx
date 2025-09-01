@@ -251,12 +251,16 @@ export default function DashboardPage() {
                           </label>
                           <div className="flex flex-col">
                             <span className={`text-white ${task.status === 'completed' ? 'line-through text-gray-400' : ''}`}>{task.text}</span>
-                            {task.dueDate && (
-                              <div className="flex items-center gap-3 text-xs text-gray-400 mt-1.5">
-                                <div className="flex items-center gap-1.5"><Calendar size={12}/> <span>{new Date(task.dueDate).toLocaleString()}</span></div>
-                                {task.status === 'pending' && <Countdown dueDate={task.dueDate} />}
-                              </div>
-                            )}
+                            <div className="flex items-center gap-3 text-xs text-gray-400 mt-1.5">
+                              {task.dueDate ? (
+                                <>
+                                  <div className="flex items-center gap-1.5"><Calendar size={12}/> <span>{new Date(task.dueDate).toLocaleString()}</span></div>
+                                  {task.status === 'pending' && <Countdown dueDate={task.dueDate} />}
+                                </>
+                              ) : (
+                                <div className="flex items-center gap-1.5"><Calendar size={12}/> <span className="text-gray-500 italic">No due date</span></div>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">

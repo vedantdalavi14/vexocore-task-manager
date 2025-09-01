@@ -6,13 +6,13 @@ import { getFirestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyA2OJKMS2N74QQGgVZ746QQx-ZIk0Vau4k",
-  authDomain: "vexocore-task-manager.firebaseapp.com",
-  projectId: "vexocore-task-manager",
-  storageBucket: "vexocore-task-manager.appspot.com", // Corrected this line
-  messagingSenderId: "205249255112",
-  appId: "1:205249255112:web:98bd0a0bbb6c43e5b737fd",
-  measurementId: "G-P8E6S7YRW1"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase
