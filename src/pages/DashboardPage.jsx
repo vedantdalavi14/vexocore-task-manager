@@ -3,7 +3,7 @@ import { signOut } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { Plus, Trash2, Pencil, Calendar, Clock, CheckSquare, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Pencil, Calendar, Clock, CheckSquare, AlertTriangle, Search } from 'lucide-react';
 
 // --- Countdown Timer Component ---
 function Countdown({ dueDate }) {
@@ -78,6 +78,7 @@ export default function DashboardPage() {
   const [editingTaskText, setEditingTaskText] = useState('');
   const [editingDueDate, setEditingDueDate] = useState('');
   const [filter, setFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState(null); // State for delete confirmation
 
@@ -103,10 +104,24 @@ export default function DashboardPage() {
   
   const filteredTasks = useMemo(() => {
     const sortedTasks = [...tasks].sort((a, b) => (a.status === 'pending' && b.status !== 'pending') ? -1 : (a.status !== 'pending' && b.status === 'pending') ? 1 : 0);
-    if (filter === 'pending') return sortedTasks.filter(task => task.status === 'pending');
-    if (filter === 'completed') return sortedTasks.filter(task => task.status === 'completed');
-    return sortedTasks;
-  }, [tasks, filter]);
+    
+    let statusFilteredTasks;
+    if (filter === 'pending') {
+      statusFilteredTasks = sortedTasks.filter(task => task.status === 'pending');
+    } else if (filter === 'completed') {
+      statusFilteredTasks = sortedTasks.filter(task => task.status === 'completed');
+    } else {
+      statusFilteredTasks = sortedTasks;
+    }
+
+    if (searchTerm.trim() === '') {
+      return statusFilteredTasks;
+    }
+
+    return statusFilteredTasks.filter(task => 
+      task.text.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [tasks, filter, searchTerm]);
 
   const handleAddTask = async (e) => {
     e.preventDefault();
@@ -208,10 +223,21 @@ export default function DashboardPage() {
             </button>
           </form>
 
-          <div className="flex justify-center gap-2 mb-6 bg-gray-900/40 p-1.5 rounded-lg">
+          <div className="flex justify-center gap-2 mb-4 bg-gray-900/40 p-1.5 rounded-lg">
             <button onClick={() => setFilter('all')} className={`flex-1 font-medium text-sm px-3 py-1.5 rounded-md transition-colors duration-200 ${filter === 'all' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700/50 hover:text-white'}`}>All Tasks</button>
             <button onClick={() => setFilter('pending')} className={`flex-1 font-medium text-sm px-3 py-1.5 rounded-md transition-colors duration-200 ${filter === 'pending' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700/50 hover:text-white'}`}>Pending</button>
             <button onClick={() => setFilter('completed')} className={`flex-1 font-medium text-sm px-3 py-1.5 rounded-md transition-colors duration-200 ${filter === 'completed' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700/50 hover:text-white'}`}>Completed</button>
+          </div>
+
+          <div className="relative mb-6">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search tasks..."
+              className="w-full bg-gray-700/50 text-white rounded-lg pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
 
           <div className="min-h-[200px]">
