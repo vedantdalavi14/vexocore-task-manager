@@ -3,7 +3,7 @@ import { signOut } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { Plus, Trash2, Pencil, Calendar, Clock, CheckSquare, AlertTriangle, Search } from 'lucide-react';
+import { Plus, Trash2, Pencil, Calendar, Clock, CheckSquare, AlertTriangle, Search, X } from 'lucide-react';
 
 // --- Countdown Timer Component ---
 function Countdown({ dueDate }) {
@@ -204,13 +204,24 @@ export default function DashboardPage() {
 
         <main className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 p-6 rounded-xl shadow-2xl">
           <form onSubmit={handleAddTask} className="flex flex-col sm:flex-row gap-3 mb-6">
-            <input
-              type="text"
-              value={newTask}
-              onChange={(e) => setNewTask(e.target.value)}
-              placeholder="What's your next task?"
-              className="flex-grow bg-gray-700/50 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <div className="relative flex-grow">
+              <input
+                type="text"
+                value={newTask}
+                onChange={(e) => setNewTask(e.target.value)}
+                placeholder="What's your next task?"
+                className="w-full bg-gray-700/50 text-white rounded-lg px-4 py-2.5 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {newTask && (
+                <button
+                  type="button"
+                  onClick={() => setNewTask('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                >
+                  <X size={20} />
+                </button>
+              )}
+            </div>
             <input
               type="datetime-local"
               value={dueDate}
@@ -236,8 +247,17 @@ export default function DashboardPage() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search tasks..."
-              className="w-full bg-gray-700/50 text-white rounded-lg pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-gray-700/50 text-white rounded-lg pl-10 pr-10 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+              >
+                <X size={20} />
+              </button>
+            )}
           </div>
 
           <div className="min-h-[200px]">
@@ -248,12 +268,23 @@ export default function DashboardPage() {
                   <li key={task.id} className="bg-gray-700/50 p-3 rounded-lg border border-transparent hover:border-gray-600 transition-colors duration-200">
                     {editingTaskId === task.id ? (
                       <div className="flex flex-col gap-2">
-                        <input
-                          type="text"
-                          value={editingTaskText}
-                          onChange={(e) => setEditingTaskText(e.target.value)}
-                          className="w-full bg-gray-600 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={editingTaskText}
+                            onChange={(e) => setEditingTaskText(e.target.value)}
+                            className="w-full bg-gray-600 text-white rounded-md px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          {editingTaskText && (
+                            <button
+                              type="button"
+                              onClick={() => setEditingTaskText('')}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                            >
+                              <X size={20} />
+                            </button>
+                          )}
+                        </div>
                         <div className="flex items-center justify-between gap-3">
                           <input
                               type="datetime-local"
