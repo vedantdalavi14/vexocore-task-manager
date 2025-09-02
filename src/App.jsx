@@ -22,9 +22,8 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center font-sans">
-        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-gray-900 via-gray-900 to-blue-900/30"></div>
-        <div className="relative z-10 w-full">
+      <div className="min-h-screen bg-gray-900 text-white font-sans bg-gradient-to-br from-gray-900 via-gray-900 to-blue-900/30">
+        <div className="w-full">
             <AppContent />
         </div>
       </div>

@@ -188,8 +188,8 @@ export default function DashboardPage() {
       {showLogoutConfirm && <ConfirmationModal icon={AlertTriangle} title="Are you sure?" message="You will be logged out of your account." confirmText="Confirm Logout" onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />}
       {taskToDelete && <ConfirmationModal icon={Trash2} title="Delete Task?" message={`This will permanently delete the task: "${taskToDelete.text}"`} confirmText="Delete Task" onConfirm={confirmDeleteTask} onCancel={() => setTaskToDelete(null)} />}
       
-      <div className="w-full max-w-3xl mx-auto p-4 md:p-6">
-        <header className="flex justify-between items-center mb-6">
+      <div className="w-full max-w-4xl mx-auto p-4 md:p-6">
+        <header className="flex justify-between items-center mb-6 pb-4 border-b border-gray-700/50">
           <div className="flex items-center gap-3">
               <CheckSquare className="w-8 h-8 text-blue-500" />
               <h1 className="text-3xl font-bold text-white tracking-tighter">TaskFlow</h1>
@@ -265,7 +265,7 @@ export default function DashboardPage() {
             filteredTasks.length > 0 ? (
               <ul className="space-y-3">
                 {filteredTasks.map(task => (
-                  <li key={task.id} className="bg-gray-700/50 p-3 rounded-lg border border-transparent hover:border-gray-600 transition-colors duration-200">
+                  <li key={task.id} className="bg-gray-800/60 p-3 rounded-lg border border-gray-700/80 hover:border-blue-500/50 hover:bg-gray-700/50 transition-all duration-200">
                     {editingTaskId === task.id ? (
                       <div className="flex flex-col gap-2">
                         <div className="relative">
@@ -333,11 +333,17 @@ export default function DashboardPage() {
                 ))}
               </ul>
             ) : ( 
-              <p className="text-center text-gray-500 pt-10">
-                {filter === 'all' && "You're all caught up!"}
-                {filter === 'pending' && 'No pending tasks. Great job!'}
-                {filter === 'completed' && 'No tasks completed yet.'}
-              </p>
+              <div className="text-center text-gray-500 pt-10 flex flex-col items-center gap-4">
+                <CheckSquare size={48} className="text-gray-600" />
+                <h3 className="text-xl font-semibold">
+                  {searchTerm ? `No tasks found for "${searchTerm}"` : "You're all caught up!"}
+                </h3>
+                <p>
+                  {searchTerm ? 'Try a different search term.' : (filter === 'all' && "You're all caught up!")}
+                  {filter === 'pending' && 'No pending tasks. Great job!'}
+                  {filter === 'completed' && 'No tasks completed yet.'}
+                </p>
+              </div>
             )}
           </div>
         </main>
